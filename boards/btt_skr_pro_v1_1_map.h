@@ -117,8 +117,8 @@
 #define M5_ENABLE_PORT              GPIOF
 #define M5_ENABLE_PIN               0
 #endif
-
-#define AUXOUTPUT0_PORT             GPIOA // Spindle PWM, EXP1
+// --ANDY Also note that GPIOA is for the PA8 pin, GPIOE=PE6 and so on
+#define AUXOUTPUT0_PORT             GPIOA // Spindle PWM, EXP1 --ANDY This references the header Ext1 for the LCD Screen!!!!
 #define AUXOUTPUT0_PIN              8
 #define AUXOUTPUT1_PORT             GPIOE // Spindle direction, FAN2
 #define AUXOUTPUT1_PIN              6
