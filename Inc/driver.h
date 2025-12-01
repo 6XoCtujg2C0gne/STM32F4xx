@@ -288,15 +288,6 @@
 
 #include "grbl/driver_opts2.h"
 
-#if SDCARD_ENABLE
-#ifndef SDCARD_SDIO
-#define SDCARD_SDIO 0
-#endif
-#if !SDCARD_SDIO && !defined(SD_CS_PORT)
-#error SD card plugin not supported!
-#endif
-#endif
-
 #if I2C_ENABLE && !defined(I2C_PORT)
 #define I2C_PORT 2 // GPIOB, SCL_PIN = 10, SDA_PIN = 11
 #endif
@@ -317,8 +308,8 @@
 #define STEPPERS_ENABLE_PINMODE PINMODE_OUTPUT
 #endif
 
-#if defined(AUXOUTPUT0_PWM_PORT) || defined(AUXOUTPUT1_PWM_PORT) ||\
-     defined(AUXOUTPUT0_ANALOG_PORT) || defined(AUXOUTPUT1_ANALOG_PORT) ||\
+#if defined(AUXOUTPUT0_PWM_PORT) || defined(AUXOUTPUT1_PWM_PORT) || defined(AUXOUTPUT2_PWM_PORT) ||\
+     defined(AUXOUTPUT0_ANALOG_PORT) || defined(AUXOUTPUT1_ANALOG_PORT) || defined(AUXOUTPUT2_ANALOG_PORT) ||\
       defined(AUXINPUT0_ANALOG_PORT) || defined(AUXINPUT1_ANALOG_PORT) ||\
        defined(MCP3221_ENABLE)
 #define AUX_ANALOG 1
