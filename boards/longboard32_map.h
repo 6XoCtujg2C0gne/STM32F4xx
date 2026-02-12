@@ -304,7 +304,7 @@
 #define COOLANT_MIST_PIN        AUXOUTPUT13_PIN
 #endif
 
-#define LED_PWM_PORT            GPIOC // rail LED strip (PWM), does not work when debugging due to U14/R96 chopping output
+#define LED_PWM_PORT            GPIOC_BASE // rail LED strip (PWM), does not work when debugging due to U14/R96 chopping output
 #define LED_PWM_PIN             9
 #if !defined(DEBUG) && RGB_LED_ENABLE
 #define LED1_GPO_PORT           GPIOA // ring LED strip (GPO), when enabled SWD debugging is blocked (use $DFU to reenable)
@@ -333,7 +333,6 @@
 #define AUXINPUT6_PORT          GPIOC // CYC/ST, MACRO3
 #define AUXINPUT6_PIN           11
 
-
 #define AUXINPUT7_PORT          GPIOD // AUX_IN_3
 #define AUXINPUT7_PIN           15
 
@@ -344,8 +343,8 @@
 #define AUXINPUT9_PIN           7
 
 #if THCAD2_ENABLE && !I2C_STROBE_ENABLE
-#define AUXINPUT0_FREQ_PORT     GPIOB // Remove R92 and C96
-#define AUXINPUT0_FREQ_PIN      3
+#define THCAD2_PORT             GPIOB_BASE // Remove R92 and C96
+#define THCAD2_PIN              3
 #else
 #define AUXINPUT10_PORT         GPIOB // I2C strobe
 #define AUXINPUT10_PIN          3
@@ -378,14 +377,28 @@
 #endif
 
 // Define probe switch input pin.
-#if PROBE_ENABLE
-#define PROBE_PORT              AUXINPUT11_PORT
-#define PROBE_PIN               AUXINPUT11_PIN
-#endif
+// If LONGBOARD_PROBESWAP is defined, then we swap the probe and toolsetter pins.
+// If undefined, the default behavior is used. Also note longboard32.c has custom code that will MUX tls/probe inputs depending on enabled features.
+#if defined(LONGBOARD_PROBESWAP)
+  #if PROBE_ENABLE
+  #define PROBE_PORT              AUXINPUT3_PORT
+  #define PROBE_PIN               AUXINPUT3_PIN
+  #endif
 
-#if TOOLSETTER_ENABLE
-#define TOOLSETTER_PORT         AUXINPUT3_PORT
-#define TOOLSETTER_PIN          AUXINPUT3_PIN
+  #if TOOLSETTER_ENABLE
+  #define TOOLSETTER_PORT         AUXINPUT11_PORT
+  #define TOOLSETTER_PIN          AUXINPUT11_PIN
+  #endif
+#else
+  #if PROBE_ENABLE
+  #define PROBE_PORT              AUXINPUT11_PORT
+  #define PROBE_PIN               AUXINPUT11_PIN
+  #endif
+
+  #if TOOLSETTER_ENABLE
+  #define TOOLSETTER_PORT         AUXINPUT3_PORT
+  #define TOOLSETTER_PIN          AUXINPUT3_PIN
+  #endif
 #endif
 
 #if I2C_STROBE_ENABLE
