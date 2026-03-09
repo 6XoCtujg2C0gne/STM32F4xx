@@ -29,6 +29,7 @@
 #include "main.h"
 #include "driver.h"
 #include "serial.h"
+#include "encoders.h"
 
 #include "grbl/task.h"
 #include "grbl/motor_pins.h"
@@ -58,12 +59,8 @@
 #include "flash.h"
 #endif
 
-#if QEI_ENABLE
-#include "grbl/encoders.h"
-#endif
-
 #if QEI_ENABLE || SPINDLE_ENCODER_ENABLE
-#include "encoders.h"
+#include "grbl/encoders.h"
 #endif
 
 #if ETHERNET_ENABLE
@@ -163,42 +160,8 @@ static input_signal_t inputpin[] = {
 #ifdef W_HOME_PIN
     { .id = Input_HomeW,          .port = W_HOME_PORT,        .pin = W_HOME_PIN,          .group = PinGroup_Home },
 #endif
-// MOTOR_FAULT input pins must be consecutive in this array
-#ifdef X_MOTOR_FAULT_PIN
+#ifdef MOTOR_FAULT_PIN
     { .id = Input_MotorFaultX,    .port = X_MOTOR_FAULT_PORT,  .pin = X_MOTOR_FAULT_PIN,  .group = PinGroup_Motor_Fault },
-#endif
-#ifdef Y_MOTOR_FAULT_PIN
-    { .id = Input_MotorFaultY,    .port = Y_MOTOR_FAULT_PORT,  .pin = Y_MOTOR_FAULT_PIN,  .group = PinGroup_Motor_Fault },
-#endif
-#ifdef Z_MOTOR_FAULT_PIN
-    { .id = Input_MotorFaultZ,    .port = Z_MOTOR_FAULT_PORT,  .pin = Z_MOTOR_FAULT_PIN,  .group = PinGroup_Motor_Fault },
-#endif
-#ifdef A_MOTOR_FAULT_PIN
-    { .id = Input_MotorFaultA,    .port = A_MOTOR_FAULT_PORT,  .pin = A_MOTOR_FAULT_PIN,  .group = PinGroup_Motor_Fault },
-#endif
-#ifdef B_MOTOR_FAULT_PIN
-    { .id = Input_MotorFaultB,    .port = B_MOTOR_FAULT_PORT,  .pin = B_MOTOR_FAULT_PIN,  .group = PinGroup_Motor_Fault },
-#endif
-#ifdef C_MOTOR_FAULT_PIN
-    { .id = Input_MotorFaultC,    .port = C_MOTOR_FAULT_PORT,  .pin = C_MOTOR_FAULT_PIN,  .group = PinGroup_Motor_Fault },
-#endif
-#ifdef U_MOTOR_FAULT_PIN
-    { .id = Input_MotorFaultU,    .port = U_MOTOR_FAULT_PORT,  .pin = U_MOTOR_FAULT_PIN,  .group = PinGroup_Motor_Fault },
-#endif
-#ifdef V_MOTOR_FAULT_PIN
-    { .id = Input_MotorFaultV,    .port = V_MOTOR_FAULT_PORT,  .pin = V_MOTOR_FAULT_PIN,  .group = PinGroup_Motor_Fault },
-#endif
-#ifdef W_MOTOR_FAULT_PIN
-    { .id = Input_MotorFaultW,    .port = W_MOTOR_FAULT_PORT,  .pin = W_MOTOR_FAULT_PIN,  .group = PinGroup_Motor_Fault },
-#endif
-#ifdef X2_MOTOR_FAULT_PIN
-    { .id = Input_MotorFaultX_2,  .port = X2_MOTOR_FAULT_PORT, .pin = X2_MOTOR_FAULT_PIN, .group = PinGroup_Motor_Fault },
-#endif
-#ifdef Y2_MOTOR_FAULT_PIN
-    { .id = Input_MotorFaultY_2,  .port = Y2_MOTOR_FAULT_PORT, .pin = Y2_MOTOR_FAULT_PIN, .group = PinGroup_Motor_Fault },
-#endif
-#ifdef Z2_MOTOR_FAULT_PIN
-    { .id = Input_MotorFaultZ_2,  .port = Z2_MOTOR_FAULT_PORT, .pin = Z2_MOTOR_FAULT_PIN, .group = PinGroup_Motor_Fault },
 #endif
 #ifdef SPINDLE_INDEX_PIN
     { .id = Input_SpindleIndex,   .port = SPINDLE_INDEX_PORT, .pin = SPINDLE_INDEX_PIN,   .group = PinGroup_SpindleIndex },
@@ -257,6 +220,18 @@ static input_signal_t inputpin[] = {
 #endif
 #ifdef AUXINPUT15_PIN
     { .id = Input_Aux15,          .port = AUXINPUT15_PORT,    .pin = AUXINPUT15_PIN,      .group = PinGroup_AuxInput },
+#endif
+#ifdef AUXINPUT16_PIN
+    { .id = Input_Aux16,          .port = AUXINPUT16_PORT,    .pin = AUXINPUT16_PIN,      .group = PinGroup_AuxInput },
+#endif
+#ifdef AUXINPUT17_PIN
+    { .id = Input_Aux17,          .port = AUXINPUT17_PORT,    .pin = AUXINPUT17_PIN,      .group = PinGroup_AuxInput },
+#endif
+#ifdef AUXINPUT18_PIN
+    { .id = Input_Aux18,          .port = AUXINPUT18_PORT,    .pin = AUXINPUT18_PIN,      .group = PinGroup_AuxInput },
+#endif
+#ifdef AUXINPUT19_PIN
+    { .id = Input_Aux19,          .port = AUXINPUT19_PORT,    .pin = AUXINPUT19_PIN,      .group = PinGroup_AuxInput },
 #endif
 #ifdef AUXINPUT0_ANALOG_PIN
     { .id = Input_Analog_Aux0,    .port = AUXINPUT0_ANALOG_PORT, .pin = AUXINPUT0_ANALOG_PIN, .group = PinGroup_AuxInputAnalog },
@@ -521,7 +496,7 @@ extern __IO uint32_t uwTick, cycle_count;
 static uint32_t systick_safe_read = 0, cycles2us_factor = 0;
 static uint32_t aux_irq = 0;
 static bool IOInitDone = false;
-static pin_group_pins_t limit_inputs = {0}, motor_fault_inputs = {};
+static pin_group_pins_t limit_inputs = {0};
 static delay_t delay = { .ms = 1, .callback = NULL }; // NOTE: initial ms set to 1 for "resetting" systick timer on startup
 static input_signal_t *pin_irq[16] = {0};
 static struct {
@@ -1734,6 +1709,11 @@ static void aux_irq_handler (uint8_t port, bool state)
     }
 }
 
+__attribute__((weak)) void motor_fault_add_pin (input_signal_t *input, xbar_t *pin)
+{
+
+}
+
 static bool aux_claim_explicit (aux_ctrl_t *aux_ctrl)
 {
     xbar_t *pin;
@@ -1751,7 +1731,10 @@ static bool aux_claim_explicit (aux_ctrl_t *aux_ctrl)
 
     if((pin = aux_ctrl_claim_port(aux_ctrl))) {
 
-        switch(aux_ctrl->function) {
+        if(xbar_is_motor_fault_in(aux_ctrl->function))
+            motor_fault_add_pin(aux_ctrl->input, pin);
+
+        else switch(aux_ctrl->function) {
 #if PROBE_ENABLE
             case Input_Probe:
                 hal.driver_cap.probe = probe_add(Probe_Default, aux_ctrl->port, pin->cap.irq_mode, aux_ctrl->input, probeGetState);
@@ -1779,9 +1762,7 @@ static bool aux_claim_explicit (aux_ctrl_t *aux_ctrl)
                 break;
 #endif
             default:
-#if QEI_ENABLE && defined(QEI_A_PIN) && defined(QEI_B_PIN)
                 encoder_pin_claimed(aux_ctrl->port, pin);
-#endif
                 break;
         }
     }
@@ -1818,7 +1799,7 @@ static void aux_assign_irq (void)
             aux = aux_ctrl_get_fn((aux_gpio_t){ .port = input->port, .pin = input->pin });
 
             if(input->cap.irq_mode == IRQ_Mode_None) {
-                if(aux && xbar_is_probe_in(aux->function))
+                if(aux && (xbar_is_probe_in(aux->function) || xbar_is_motor_fault_in(aux->function)))
                     input->id = aux->function;
             } else {
 
@@ -1834,11 +1815,11 @@ static void aux_assign_irq (void)
                         if(input->pin == input2->pin) {
                             if(input->id < input2->id || (aux->signal.bits & main_signals.bits)) {
                                 input2->cap.irq_mode = IRQ_Mode_None;
-                                if(!xbar_is_probe_in(input2->id))
+                                if(!(xbar_is_probe_in(input2->id) || xbar_is_motor_fault_in(aux->function)))
                                     input2->id = (pin_function_t)(Input_Aux0 + input2->user_port);
                             } else {
                                 input->cap.irq_mode = IRQ_Mode_None;
-                                if(!xbar_is_probe_in(input->id))
+                                if(!(xbar_is_probe_in(input->id) || xbar_is_motor_fault_in(aux->function)))
                                     input->id = (pin_function_t)(Input_Aux0 + input->user_port);
                             }
                         }
@@ -1992,10 +1973,6 @@ void settings_changed (settings_t *settings, settings_changed_flags_t changed)
 
 #ifdef SQUARING_ENABLED
         hal.stepper.disable_motors((axes_signals_t){0}, SquaringMode_Both);
-#endif
-
-#if SPINDLE_ENCODER_ENABLE
-        spindle_encoder_cfg(settings);
 #endif
 
         float sl = (float)hal.f_step_timer / 1000000.0f;
@@ -2762,7 +2739,7 @@ bool driver_init (void)
 #else
     hal.info = "STM32F401";
 #endif
-    hal.driver_version = "260222";
+    hal.driver_version = "260308";
     hal.driver_url = GRBL_URL "/STM32F4xx";
 #ifdef BOARD_NAME
     hal.board = BOARD_NAME;
@@ -2994,12 +2971,6 @@ bool driver_init (void)
                 limit_inputs.n_pins++;
                 break;
 
-            case PinGroup_Motor_Fault:
-                if(motor_fault_inputs.pins.inputs == NULL)
-                    motor_fault_inputs.pins.inputs = input;
-                motor_fault_inputs.n_pins++;
-                break;
-
             case PinGroup_SdCard:
                 if(input->bit & DEVICES_IRQ_MASK)
                     pin_irq[__builtin_ffs(input->bit) - 1] = input;
@@ -3069,7 +3040,7 @@ bool driver_init (void)
     tmc_uart_init();
 #endif
 
-#ifdef QEI_PORT
+#if SPINDLE_ENCODER_ENABLE || (QEI_ENABLE && defined(QEI_PORT))
     driver_encoders_init();
 #endif
 
@@ -3111,11 +3082,6 @@ bool driver_init (void)
     // No need to move version check before init.
     // Compiler will fail any signature mismatch for existing entries.
     return hal.version == 10;
-}
-
-pin_group_pins_t *get_motor_fault_inputs (void)
-{
-    return motor_fault_inputs.n_pins ? &motor_fault_inputs : NULL;
 }
 
 /* interrupt handlers */
