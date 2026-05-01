@@ -3,7 +3,7 @@
 
   Part of grblHAL
 
-  Copyright (c) 2023-2025 Terje Io
+  Copyright (c) 2023-2026 Terje Io
   SoftSPI implementation Copyright (c) 2021 fitch22
 
   grblHAL is free software: you can redistribute it and/or modify
@@ -206,7 +206,7 @@ void tmc_spi_init (void)
 #define TMC_SPI_PORT SPIport(TRINAMIC_SPI_PORT)
 #endif
 
-#define spi_init() _spi_init()
+#define spi_start(d) _spi_start(d)
 #define spi_get_byte() _spi_get_byte()
 #define spi_put_byte(d) _spi_put_byte(d)
 
@@ -246,7 +246,7 @@ static uint8_t _spi_put_byte (uint8_t byte)
     return (uint8_t)spi_port.Instance->DR;
 }
 
-static void _spi_init (void)
+static void spi_init (void)
 {
     static bool init_ok = false;
 
@@ -385,25 +385,19 @@ static void _spi_init (void)
     }
 }
 
-#else // shared SPI port
-
-#include "spi.h"
-
 #endif // TRINAMIC_SPI_PORT
 
- #if TRINAMIC_SPI_ENABLE & TRINAMIC_SPI_CS_SINGLE
+#if TRINAMIC_SPI_ENABLE & TRINAMIC_SPI_CS_SINGLE
 
 #if TRINAMIC_SPI_ENABLE & TRINAMIC_SPI_20BIT
 #error "20 bit Trinamic SPI datagrams not yet supported!"
 #endif
 
-static struct {
-    GPIO_TypeDef *port;
-    uint32_t pin;
-} cs;
-
 static uint_fast8_t n_motors;
 static TMC_spi_datagram_t datagram[TMC_N_MOTORS_MAX];
+static spi_slave_t dev = {
+    .f_clock = SPI_BAUDRATEPRESCALER_32
+};
 
 TMC_spi_status_t tmc_spi_read (trinamic_motor_t driver, TMC_spi_datagram_t *reg)
 {
@@ -411,14 +405,15 @@ TMC_spi_status_t tmc_spi_read (trinamic_motor_t driver, TMC_spi_datagram_t *reg)
 
     uint8_t res;
     uint_fast8_t idx = n_motors;
-#ifndef TRINAMIC_SPI_PORT
-    uint32_t f_spi = spi_set_speed(SPI_BAUDRATEPRESCALER_32);
-#endif
 
     datagram[driver.seq].addr.value = reg->addr.value;
     datagram[driver.seq].addr.write = 0;
 
+#ifdef TRINAMIC_SPI_PORT
     DIGITAL_OUT(cs.port, cs.pin, 0);
+#else
+    spi_select(&dev);
+#endif
 
     do {
         spi_put_byte(datagram[--idx].addr.value);
@@ -429,9 +424,17 @@ TMC_spi_status_t tmc_spi_read (trinamic_motor_t driver, TMC_spi_datagram_t *reg)
     } while(idx);
 
     delay(100);
+#ifdef TRINAMIC_SPI_PORT
     DIGITAL_OUT(cs.port, cs.pin, 1);
+#else
+    spi_deselect(&dev);
+#endif
     delay(50);
+#ifdef TRINAMIC_SPI_PORT
     DIGITAL_OUT(cs.port, cs.pin, 0);
+#else
+    spi_select(&dev);
+#endif
 
     idx = n_motors;
     do {
@@ -452,12 +455,12 @@ TMC_spi_status_t tmc_spi_read (trinamic_motor_t driver, TMC_spi_datagram_t *reg)
     } while(idx);
 
     delay(100);
+#ifdef TRINAMIC_SPI_PORT
     DIGITAL_OUT(cs.port, cs.pin, 1);
-    delay(50);
-
-#ifndef TRINAMIC_SPI_PORT
-    spi_set_speed(f_spi);
+#else
+    spi_deselect(&dev);
 #endif
+    delay(50);
 
     return status;
 }
@@ -468,14 +471,15 @@ TMC_spi_status_t tmc_spi_write (trinamic_motor_t driver, TMC_spi_datagram_t *reg
 
     uint8_t res;
     uint_fast8_t idx = n_motors;
-#ifndef TRINAMIC_SPI_PORT
-    uint32_t f_spi = spi_set_speed(SPI_BAUDRATEPRESCALER_32);
-#endif
 
     memcpy(&datagram[driver.seq], reg, sizeof(TMC_spi_datagram_t));
     datagram[driver.seq].addr.write = 1;
 
+#ifdef TRINAMIC_SPI_PORT
     DIGITAL_OUT(cs.port, cs.pin, 0);
+#else
+    spi_select(&dev);
+#endif
 
     do {
         res = spi_put_byte(datagram[--idx].addr.value);
@@ -492,12 +496,12 @@ TMC_spi_status_t tmc_spi_write (trinamic_motor_t driver, TMC_spi_datagram_t *reg
     } while(idx);
 
     delay(100);
+#ifdef TRINAMIC_SPI_PORT
     DIGITAL_OUT(cs.port, cs.pin, 1);
-    delay(50);
-
-#ifndef TRINAMIC_SPI_PORT
-    spi_set_speed(f_spi);
+#else
+    spi_deselect(&dev);
 #endif
+    delay(50);
 
     return status;
 }
@@ -505,8 +509,8 @@ TMC_spi_status_t tmc_spi_write (trinamic_motor_t driver, TMC_spi_datagram_t *reg
 static void add_cs_pin (xbar_t *gpio, void *data)
 {
     if(gpio->function == Output_MotorChipSelect) {
-        cs.pin = gpio->pin;
-        cs.port = (GPIO_TypeDef *)gpio->port;
+        dev.cs_pin = gpio->pin;
+        dev.cs_port = gpio->port;
     }
 }
 
@@ -522,7 +526,11 @@ void tmc_spi_init (void)
         .on_drivers_init = if_init
     };
 
+#ifdef TRINAMIC_SPI_PORT
     spi_init();
+#else
+    spi_start(&dev);
+#endif
 
     uint_fast8_t idx = TMC_N_MOTORS_MAX;
     do {
@@ -542,11 +550,14 @@ static struct {
 TMC_spi_status_t tmc_spi_read (trinamic_motor_t driver, TMC_spi_datagram_t *datagram)
 {
     TMC_spi_status_t status;
-#ifndef TRINAMIC_SPI_PORT
-    uint32_t f_spi = spi_set_speed(SPI_BAUDRATEPRESCALER_32);
-#endif
 
+#ifdef TRINAMIC_SPI_PORT
     DIGITAL_OUT(cs[driver.id].port, cs[driver.id].pin, 0);
+#else
+    dev.cs_pin = cs[driver.id].pin;
+    dev.cs_port = cs[driver.id].port;
+    spi_select(&dev);
+#endif
 
     datagram->payload.value = 0;
 
@@ -557,9 +568,17 @@ TMC_spi_status_t tmc_spi_read (trinamic_motor_t driver, TMC_spi_datagram_t *data
     spi_put_byte(0);
     spi_put_byte(0);
 
+#ifdef TRINAMIC_SPI_PORT
     DIGITAL_OUT(cs[driver.id].port, cs[driver.id].pin, 1);
+#else
+    spi_deselect(&dev);
+#endif
     delay(10);
+#ifdef TRINAMIC_SPI_PORT
     DIGITAL_OUT(cs[driver.id].port, cs[driver.id].pin, 0);
+#else
+    spi_select(&dev);
+#endif
 
     status = spi_put_byte(datagram->addr.value);
     datagram->payload.data[3] = spi_get_byte();
@@ -567,10 +586,10 @@ TMC_spi_status_t tmc_spi_read (trinamic_motor_t driver, TMC_spi_datagram_t *data
     datagram->payload.data[1] = spi_get_byte();
     datagram->payload.data[0] = spi_get_byte();
 
+#ifdef TRINAMIC_SPI_PORT
     DIGITAL_OUT(cs[driver.id].port, cs[driver.id].pin, 1);
-
-#ifndef TRINAMIC_SPI_PORT
-    spi_set_speed(f_spi);
+#else
+    spi_deselect(&dev);
 #endif
 
     return status;
@@ -579,11 +598,14 @@ TMC_spi_status_t tmc_spi_read (trinamic_motor_t driver, TMC_spi_datagram_t *data
 TMC_spi_status_t tmc_spi_write (trinamic_motor_t driver, TMC_spi_datagram_t *datagram)
 {
     TMC_spi_status_t status;
-#ifndef TRINAMIC_SPI_PORT
-    uint32_t f_spi = spi_set_speed(SPI_BAUDRATEPRESCALER_32);
-#endif
 
+#ifdef TRINAMIC_SPI_PORT
     DIGITAL_OUT(cs[driver.id].port, cs[driver.id].pin, 0);
+#else
+    dev.cs_pin = cs[driver.id].pin;
+    dev.cs_port = cs[driver.id].port;
+    spi_select(&dev);
+#endif
 
     datagram->addr.write = 1;
     status = spi_put_byte(datagram->addr.value);
@@ -592,10 +614,10 @@ TMC_spi_status_t tmc_spi_write (trinamic_motor_t driver, TMC_spi_datagram_t *dat
     spi_put_byte(datagram->payload.data[1]);
     spi_put_byte(datagram->payload.data[0]);
 
+#ifdef TRINAMIC_SPI_PORT
     DIGITAL_OUT(cs[driver.id].port, cs[driver.id].pin, 1);
-
-#ifndef TRINAMIC_SPI_PORT
-    spi_set_speed(f_spi);
+#else
+    spi_deselect(&dev);
 #endif
 
     return status;
@@ -604,25 +626,27 @@ TMC_spi_status_t tmc_spi_write (trinamic_motor_t driver, TMC_spi_datagram_t *dat
 TMC_spi20_datagram_t tmc_spi20_write (trinamic_motor_t driver, TMC_spi20_datagram_t *datagram)
 {
     TMC_spi20_datagram_t status = {0};
-#ifndef TRINAMIC_SPI_PORT
-    uint32_t f_spi = spi_set_speed(SPI_BAUDRATEPRESCALER_32);
-#else
-    while(__HAL_SPI_GET_FLAG(&spi_port, SPI_FLAG_BSY)) {};
-#endif
 
+#ifdef TRINAMIC_SPI_PORT
+    while(__HAL_SPI_GET_FLAG(&spi_port, SPI_FLAG_BSY)) {};
     DIGITAL_OUT(cs[driver.id].port, cs[driver.id].pin, 0);
+#else
+    dev.cs_pin = cs[driver.id].pin;
+    dev.cs_port = cs[driver.id].port;
+    spi_select(&dev);
+#endif
 
     status.data[2] = spi_put_byte(datagram->data[2]);
     status.data[1] = spi_put_byte(datagram->data[1]);
     status.data[0] = spi_put_byte(datagram->data[0]);
 
+#ifdef TRINAMIC_SPI_PORT
     DIGITAL_OUT(cs[driver.id].port, cs[driver.id].pin, 1);
+#else
+    spi_deselect(&dev);
+#endif
 
     status.value >>= 4;
-
-#ifndef TRINAMIC_SPI_PORT
-    spi_set_speed(f_spi);
-#endif
 
     return status;
 }
@@ -678,8 +702,11 @@ void tmc_spi_init (void)
 {
     static trinamic_driver_if_t driver_if = {.on_drivers_init = if_init};
 
+#ifdef TRINAMIC_SPI_PORT
     spi_init();
-
+#else
+    spi_start(&dev);
+#endif
     trinamic_if_init(&driver_if);
 }
 #endif

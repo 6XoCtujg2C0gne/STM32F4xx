@@ -221,6 +221,7 @@ static input_signal_t inputpin[] = {
 #ifdef AUXINPUT15_PIN
     { .id = Input_Aux15,          .port = AUXINPUT15_PORT,    .pin = AUXINPUT15_PIN,      .group = PinGroup_AuxInput },
 #endif
+#if N_AUX_DIN > 16
 #ifdef AUXINPUT16_PIN
     { .id = Input_Aux16,          .port = AUXINPUT16_PORT,    .pin = AUXINPUT16_PIN,      .group = PinGroup_AuxInput },
 #endif
@@ -233,6 +234,19 @@ static input_signal_t inputpin[] = {
 #ifdef AUXINPUT19_PIN
     { .id = Input_Aux19,          .port = AUXINPUT19_PORT,    .pin = AUXINPUT19_PIN,      .group = PinGroup_AuxInput },
 #endif
+#ifdef AUXINPUT20_PIN
+    { .id = Input_Aux20,          .port = AUXINPUT20_PORT,    .pin = AUXINPUT20_PIN,      .group = PinGroup_AuxInput },
+#endif
+#ifdef AUXINPUT21_PIN
+    { .id = Input_Aux21,          .port = AUXINPUT21_PORT,    .pin = AUXINPUT21_PIN,      .group = PinGroup_AuxInput },
+#endif
+#ifdef AUXINPUT22_PIN
+    { .id = Input_Aux22,          .port = AUXINPUT22_PORT,    .pin = AUXINPUT22_PIN,      .group = PinGroup_AuxInput },
+#endif
+#ifdef AUXINPUT23_PIN
+    { .id = Input_Aux23,          .port = AUXINPUT23_PORT,    .pin = AUXINPUT23_PIN,      .group = PinGroup_AuxInput },
+#endif
+#endif // N_AUX_DIN > 16
 #ifdef AUXINPUT0_ANALOG_PIN
     { .id = Input_Analog_Aux0,    .port = AUXINPUT0_ANALOG_PORT, .pin = AUXINPUT0_ANALOG_PIN, .group = PinGroup_AuxInputAnalog },
 #endif
@@ -401,13 +415,22 @@ static output_signal_t outputpin[] = {
     { .id = Bidirectional_MotorUARTM7,  .port = MOTOR_UARTM7_PORT,  .pin = MOTOR_UARTM7_PIN,        .group = PinGroup_MotorUART },
 #endif
 #ifdef FLASH_CS_PORT
-    { .id = Output_FlashCS,         .port = FLASH_CS_PORT,          .pin = FLASH_CS_PIN,            .group = PinGroup_SPI },
+    { .id = Output_FlashCS,         .port = FLASH_CS_PORT,          .pin = FLASH_CS_PIN,            .group = PinGroup_SPICS },
 #endif
 #ifdef SD_CS_PORT
-    { .id = Output_SdCardCS,        .port = SD_CS_PORT,             .pin = SD_CS_PIN,               .group = PinGroup_SdCard },
+    { .id = Output_SdCardCS,        .port = SD_CS_PORT,             .pin = SD_CS_PIN,               .group = PinGroup_SPICS },
 #endif
 #ifdef SPI_CS_PORT
-    { .id = Output_SPICS,           .port = SPI_CS_PORT,            .pin = SPI_CS_PIN,              .group = PinGroup_SPI },
+    { .id = Output_SPICS0,           .port = SPI_CS_PORT,           .pin = SPI_CS_PIN,              .group = PinGroup_SPICS },
+#endif
+#ifdef SPI_CS1_PORT
+    { .id = Output_SPICS1,           .port = SPI_CS1_PORT,          .pin = SPI_CS1_PIN,             .group = PinGroup_SPICS },
+#endif
+#ifdef SPI_CS2_PORT
+    { .id = Output_SPICS2,           .port = SPI_CS2_PORT,          .pin = SPI_CS2_PIN,             .group = PinGroup_SPICS },
+#endif
+#ifdef SPI_CS3_PORT
+    { .id = Output_SPICS3,           .port = SPI_CS3_PORT,          .pin = SPI_CS3_PIN,             .group = PinGroup_SPICS },
 #endif
 #ifdef SPI_RST_PORT
     { .id = Output_SPIRST,          .port = SPI_RST_PORT,           .pin = SPI_RST_PIN,             .group = PinGroup_SPI },
@@ -1711,12 +1734,24 @@ static void aux_irq_handler (uint8_t port, bool state)
 
 __attribute__((weak)) void motor_fault_add_pin (input_signal_t *input, xbar_t *pin)
 {
-
+    // NOOP
 }
+
+#ifdef USE_EXPANDERS
+__attribute__((weak)) bool input_add_expander_pin (xbar_t *pin)
+{
+    return false;
+}
+#endif
 
 static bool aux_claim_explicit (aux_ctrl_t *aux_ctrl)
 {
     xbar_t *pin;
+
+#ifdef USE_EXPANDERS
+    if(aux_ctrl->gpio.port == (void *)EXPANDER_PORT)
+        return input_add_expander_pin((xbar_t *)aux_ctrl->input);
+#endif
 
     if(aux_ctrl->input == NULL) {
 
@@ -1808,18 +1843,18 @@ static void aux_assign_irq (void)
 
                 if(irq & input->bit) { // duplicate IRQ
 
-                    if(aux == NULL)
+                    if(aux == NULL || xbar_is_motor_fault_in(aux->function))
                         input->cap.irq_mode = IRQ_Mode_None;
                     else for(j = 0; j < aux_digital_in.n_pins - 1; j++) {
                         input2 = &aux_digital_in.pins.inputs[j];
                         if(input->pin == input2->pin) {
                             if(input->id < input2->id || (aux->signal.bits & main_signals.bits)) {
                                 input2->cap.irq_mode = IRQ_Mode_None;
-                                if(!(xbar_is_probe_in(input2->id) || xbar_is_motor_fault_in(aux->function)))
+                                if(!(xbar_is_probe_in(input2->id)))
                                     input2->id = (pin_function_t)(Input_Aux0 + input2->user_port);
                             } else {
                                 input->cap.irq_mode = IRQ_Mode_None;
-                                if(!(xbar_is_probe_in(input->id) || xbar_is_motor_fault_in(aux->function)))
+                                if(!(xbar_is_probe_in(input->id)))
                                     input->id = (pin_function_t)(Input_Aux0 + input->user_port);
                             }
                         }
@@ -2493,10 +2528,8 @@ static bool driver_setup (settings_t *settings)
 
             if(outputpin[i].group == PinGroup_MotorChipSelect ||
                 outputpin[i].group == PinGroup_MotorUART ||
-                 outputpin[i].id == Output_SPICS ||
-                  outputpin[i].id == Output_FlashCS ||
-                   outputpin[i].id == Output_SdCardCS ||
-                    (outputpin[i].group == PinGroup_StepperEnable && (st_enable.mask & xbar_fn_to_axismask(outputpin[i].id).mask)))
+                 outputpin[i].group == PinGroup_SPICS ||
+                  (outputpin[i].group == PinGroup_StepperEnable && (st_enable.mask & xbar_fn_to_axismask(outputpin[i].id).mask)))
                 outputpin[i].port->BSRR = GPIO_Init.Pin;
 
             HAL_GPIO_Init(outputpin[i].port, &GPIO_Init);
@@ -2739,7 +2772,7 @@ bool driver_init (void)
 #else
     hal.info = "STM32F401";
 #endif
-    hal.driver_version = "260308";
+    hal.driver_version = "260410";
     hal.driver_url = GRBL_URL "/STM32F4xx";
 #ifdef BOARD_NAME
     hal.board = BOARD_NAME;
