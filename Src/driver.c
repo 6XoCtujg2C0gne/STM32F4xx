@@ -160,9 +160,6 @@ static input_signal_t inputpin[] = {
 #ifdef W_HOME_PIN
     { .id = Input_HomeW,          .port = W_HOME_PORT,        .pin = W_HOME_PIN,          .group = PinGroup_Home },
 #endif
-#ifdef MOTOR_FAULT_PIN
-    { .id = Input_MotorFaultX,    .port = X_MOTOR_FAULT_PORT,  .pin = X_MOTOR_FAULT_PIN,  .group = PinGroup_Motor_Fault },
-#endif
 #ifdef SPINDLE_INDEX_PIN
     { .id = Input_SpindleIndex,   .port = SPINDLE_INDEX_PORT, .pin = SPINDLE_INDEX_PIN,   .group = PinGroup_SpindleIndex },
 #endif
@@ -603,7 +600,7 @@ static void driver_delay (uint32_t ms, delay_callback_ptr callback)
     if((delay.ms = ms) > 0) {
         if(!(delay.callback = callback)) {
             while(delay.ms)
-                grbl.on_execute_delay(state_get());
+                task_execute(true);
         }
     } else {
         delay.callback = NULL;
@@ -1923,30 +1920,55 @@ static void rgb_out_masked (uint16_t device, rgb_color_t color, rgb_color_mask_t
 
 #endif
 
+static volatile uint32_t lock;
+
+static void disable_irq (void)
+{
+    if(!__get_PRIMASK() || lock) {
+        lock++;
+        __disable_irq();
+    }
+}
+
+static void enable_irq (void)
+{
+    if(lock && !--lock)
+        __enable_irq();
+}
+
 // Helper functions for setting/clearing/inverting individual bits atomically (uninterruptable)
 static void bitsSetAtomic (volatile uint_fast16_t *ptr, uint_fast16_t bits)
 {
-    __disable_irq();
+    uint32_t irq = __get_PRIMASK();
+    __set_PRIMASK(1);
+
     *ptr |= bits;
-    __enable_irq();
+
+    __set_PRIMASK(irq);
 }
 
 static uint_fast16_t bitsClearAtomic (volatile uint_fast16_t *ptr, uint_fast16_t bits)
 {
-    __disable_irq();
+    uint32_t irq = __get_PRIMASK();
+    __set_PRIMASK(1);
+
     uint_fast16_t prev = *ptr;
     *ptr &= ~bits;
-    __enable_irq();
+
+    __set_PRIMASK(irq);
 
     return prev;
 }
 
 static uint_fast16_t valueSetAtomic (volatile uint_fast16_t *ptr, uint_fast16_t value)
 {
-    __disable_irq();
+    uint32_t irq = __get_PRIMASK();
+    __set_PRIMASK(1);
+
     uint_fast16_t prev = *ptr;
     *ptr = value;
-    __enable_irq();
+
+    __set_PRIMASK(irq);
 
     return prev;
 }
@@ -2776,7 +2798,7 @@ bool driver_init (void)
 #else
     hal.info = "STM32F401";
 #endif
-    hal.driver_version = "260729";
+    hal.driver_version = "261013";
     hal.driver_url = GRBL_URL "/STM32F4xx";
 #ifdef BOARD_NAME
     hal.board = BOARD_NAME;
@@ -2825,8 +2847,8 @@ bool driver_init (void)
     hal.control.get_state = systemGetState;
 
     hal.reboot = NVIC_SystemReset;
-    hal.irq_enable = __enable_irq;
-    hal.irq_disable = __disable_irq;
+    hal.irq_enable = enable_irq;
+    hal.irq_disable = disable_irq;
 #if I2C_STROBE_ENABLE || defined(SPI_IRQ_PIN)
     hal.irq_claim = irq_claim;
 #endif
@@ -2951,7 +2973,6 @@ bool driver_init (void)
     hal.coolant_cap.bits = COOLANT_ENABLE;
     hal.driver_cap.software_debounce = On;
     hal.driver_cap.step_pulse_delay = On;
-    hal.driver_cap.amass_level = 3;
     hal.driver_cap.control_pull_up = On;
     hal.driver_cap.limits_pull_up = On;
 
