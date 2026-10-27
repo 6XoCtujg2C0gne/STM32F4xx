@@ -1,10 +1,10 @@
 /*
 
-  timers.c - driver code for STM32F7xx ARM processors
+  timers.c - driver code for STM32F4xx ARM processors
 
   Part of grblHAL
 
-  Copyright (c) 2024 Terje Io
+  Copyright (c) 2024-2026 Terje Io
 
   grblHAL is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -24,7 +24,6 @@
 
 typedef struct {
     TIM_TypeDef *timer;
-    timer_resolution_t resolution;
     bool claimed;
     timer_cfg_t cfg;
     timer_cap_t cap;
@@ -39,10 +38,11 @@ static dtimer_t timers[] = {
     {
         .timer = TIM1,
         .irq = TIM1_UP_TIM10_IRQn,
-        .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM1) ? Timer_32bit : Timer_16bit,
         .cap = {
           .comp1 = IS_TIM_CC1_INSTANCE(TIM1),
-          .comp2 = IS_TIM_CC2_INSTANCE(TIM1)
+          .comp2 = IS_TIM_CC2_INSTANCE(TIM1),
+          .comp3 = IS_TIM_CC3_INSTANCE(TIM1),
+          .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM1) ? Timer_32bit : Timer_16bit
         }
     },
 #endif
@@ -50,10 +50,11 @@ static dtimer_t timers[] = {
     {
         .timer = TIM2,
         .irq = TIM2_IRQn,
-        .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM2) ? Timer_32bit : Timer_16bit,
         .cap = {
           .comp1 = IS_TIM_CC1_INSTANCE(TIM2),
-          .comp2 = IS_TIM_CC2_INSTANCE(TIM2)
+          .comp2 = IS_TIM_CC2_INSTANCE(TIM2),
+          .comp3 = IS_TIM_CC3_INSTANCE(TIM2),
+          .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM2) ? Timer_32bit : Timer_16bit
         }
     },
 #endif
@@ -61,10 +62,11 @@ static dtimer_t timers[] = {
     {
         .timer = TIM3,
         .irq = TIM3_IRQn,
-        .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM3) ? Timer_32bit : Timer_16bit,
         .cap = {
           .comp1 = IS_TIM_CC1_INSTANCE(TIM3),
-          .comp2 = IS_TIM_CC2_INSTANCE(TIM3)
+          .comp2 = IS_TIM_CC2_INSTANCE(TIM3),
+          .comp3 = IS_TIM_CC3_INSTANCE(TIM3),
+          .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM3) ? Timer_32bit : Timer_16bit
         }
     },
 #endif
@@ -72,10 +74,11 @@ static dtimer_t timers[] = {
     {
         .timer = TIM4,
         .irq = TIM4_IRQn,
-        .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM4) ? Timer_32bit : Timer_16bit,
         .cap = {
           .comp1 = IS_TIM_CC1_INSTANCE(TIM4),
-          .comp2 = IS_TIM_CC2_INSTANCE(TIM4)
+          .comp2 = IS_TIM_CC2_INSTANCE(TIM4),
+          .comp3 = IS_TIM_CC3_INSTANCE(TIM4),
+          .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM4) ? Timer_32bit : Timer_16bit
         }
     },
 #endif
@@ -83,10 +86,11 @@ static dtimer_t timers[] = {
     {
         .timer = TIM5,
         .irq = TIM5_IRQn,
-        .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM5) ? Timer_32bit : Timer_16bit,
         .cap = {
           .comp1 = IS_TIM_CC1_INSTANCE(TIM5),
-          .comp2 = IS_TIM_CC2_INSTANCE(TIM5)
+          .comp2 = IS_TIM_CC2_INSTANCE(TIM5),
+          .comp3 = IS_TIM_CC3_INSTANCE(TIM5),
+          .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM5) ? Timer_32bit : Timer_16bit
         }
     },
 #endif
@@ -98,10 +102,11 @@ static dtimer_t timers[] = {
 #else
         .irq = TIM6_DAC_IRQn,
 #endif
-        .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM6) ? Timer_32bit : Timer_16bit,
         .cap = {
           .comp1 = IS_TIM_CC1_INSTANCE(TIM6),
-          .comp2 = IS_TIM_CC2_INSTANCE(TIM6)
+          .comp2 = IS_TIM_CC2_INSTANCE(TIM6),
+          .comp3 = IS_TIM_CC3_INSTANCE(TIM6),
+          .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM6) ? Timer_32bit : Timer_16bit
         }
     },
 #endif
@@ -109,10 +114,11 @@ static dtimer_t timers[] = {
     {
         .timer = TIM7,
         .irq = TIM7_IRQn,
-        .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM7) ? Timer_32bit : Timer_16bit,
         .cap = {
           .comp1 = IS_TIM_CC1_INSTANCE(TIM7),
-          .comp2 = IS_TIM_CC2_INSTANCE(TIM7)
+          .comp2 = IS_TIM_CC2_INSTANCE(TIM7),
+          .comp3 = IS_TIM_CC3_INSTANCE(TIM7),
+          .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM7) ? Timer_32bit : Timer_16bit
         }
     },
 #endif
@@ -120,10 +126,11 @@ static dtimer_t timers[] = {
     {
         .timer = TIM8,
         .irq = TIM8_UP_TIM13_IRQn,
-        .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM8) ? Timer_32bit : Timer_16bit,
         .cap = {
           .comp1 = IS_TIM_CC1_INSTANCE(TIM8),
-          .comp2 = IS_TIM_CC2_INSTANCE(TIM8)
+          .comp2 = IS_TIM_CC2_INSTANCE(TIM8),
+          .comp3 = IS_TIM_CC3_INSTANCE(TIM8),
+          .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM8) ? Timer_32bit : Timer_16bit
         }
     },
 #endif
@@ -131,10 +138,11 @@ static dtimer_t timers[] = {
     {
         .timer = TIM9,
         .irq = TIM1_BRK_TIM9_IRQn,
-        .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM9) ? Timer_32bit : Timer_16bit,
         .cap = {
           .comp1 = IS_TIM_CC1_INSTANCE(TIM9),
-          .comp2 = IS_TIM_CC2_INSTANCE(TIM9)
+          .comp2 = IS_TIM_CC2_INSTANCE(TIM9),
+          .comp3 = IS_TIM_CC3_INSTANCE(TIM9),
+          .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM9) ? Timer_32bit : Timer_16bit
         }
     },
 #endif
@@ -142,10 +150,11 @@ static dtimer_t timers[] = {
     {
         .timer = TIM10,
         .irq = TIM1_UP_TIM10_IRQn,
-        .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM10) ? Timer_32bit : Timer_16bit,
         .cap = {
           .comp1 = IS_TIM_CC1_INSTANCE(TIM10),
-          .comp2 = IS_TIM_CC2_INSTANCE(TIM10)
+          .comp2 = IS_TIM_CC2_INSTANCE(TIM10),
+          .comp3 = IS_TIM_CC3_INSTANCE(TIM10),
+          .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM10) ? Timer_32bit : Timer_16bit
         }
     },
 #endif
@@ -153,10 +162,11 @@ static dtimer_t timers[] = {
     {
         .timer = TIM11,
         .irq = TIM1_TRG_COM_TIM11_IRQn,
-        .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM11) ? Timer_32bit : Timer_16bit,
         .cap = {
           .comp1 = IS_TIM_CC1_INSTANCE(TIM11),
-          .comp2 = IS_TIM_CC2_INSTANCE(TIM11)
+          .comp2 = IS_TIM_CC2_INSTANCE(TIM11),
+          .comp3 = IS_TIM_CC3_INSTANCE(TIM11),
+          .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM11) ? Timer_32bit : Timer_16bit
         }
     },
 #endif
@@ -164,10 +174,11 @@ static dtimer_t timers[] = {
     {
         .timer = TIM12,
         .irq = TIM8_BRK_TIM12_IRQn,
-        .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM12) ? Timer_32bit : Timer_16bit,
         .cap = {
           .comp1 = IS_TIM_CC1_INSTANCE(TIM12),
-          .comp2 = IS_TIM_CC2_INSTANCE(TIM12)
+          .comp2 = IS_TIM_CC2_INSTANCE(TIM12),
+          .comp3 = IS_TIM_CC3_INSTANCE(TIM12),
+          .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM12) ? Timer_32bit : Timer_16bit
         }
     },
 #endif
@@ -175,10 +186,11 @@ static dtimer_t timers[] = {
     {
         .timer = TIM13,
         .irq = TIM8_UP_TIM13_IRQn,
-        .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM13) ? Timer_32bit : Timer_16bit,
         .cap = {
           .comp1 = IS_TIM_CC1_INSTANCE(TIM13),
-          .comp2 = IS_TIM_CC2_INSTANCE(TIM13)
+          .comp2 = IS_TIM_CC2_INSTANCE(TIM13),
+          .comp3 = IS_TIM_CC3_INSTANCE(TIM13),
+          .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM13) ? Timer_32bit : Timer_16bit
         }
     },
 #endif
@@ -186,10 +198,11 @@ static dtimer_t timers[] = {
     {
         .timer = TIM14,
         .irq = TIM8_TRG_COM_TIM14_IRQn,
-        .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM14) ? Timer_32bit : Timer_16bit,
         .cap = {
           .comp1 = IS_TIM_CC1_INSTANCE(TIM14),
-          .comp2 = IS_TIM_CC2_INSTANCE(TIM14)
+          .comp2 = IS_TIM_CC2_INSTANCE(TIM14),
+          .comp3 = IS_TIM_CC3_INSTANCE(TIM14),
+          .resolution = IS_TIM_32B_COUNTER_INSTANCE(TIM14) ? Timer_32bit : Timer_16bit
         }
     }
 #endif
@@ -210,7 +223,21 @@ static dtimer_t *timer_get (TIM_TypeDef *timer)
     return dtimer;
 }
 
-bool timer_claim (TIM_TypeDef *timer)
+timer_resolution_t timer_get_resolution (TIM_TypeDef *timer)
+{
+    dtimer_t *dtimer;
+
+    return (timer_resolution_t)((dtimer = timer_get(timer)) ? dtimer->cap.resolution : 0);
+}
+
+timer_cap_t timer_get_cap (TIM_TypeDef *timer)
+{
+    dtimer_t *dtimer;
+
+    return (dtimer = timer_get(timer)) ? dtimer->cap : (timer_cap_t){0};
+}
+
+hal_timer_t timer_claim (TIM_TypeDef *timer)
 {
     bool claimed = false;
     dtimer_t *dtimer;
@@ -218,7 +245,7 @@ bool timer_claim (TIM_TypeDef *timer)
     if((claimed = (dtimer = timer_get(timer)) && !dtimer->claimed))
         dtimer->claimed = true;
 
-    return claimed;
+    return claimed ? dtimer : NULL;
 }
 
 bool timer_is_claimed (TIM_TypeDef *timer)
@@ -333,7 +360,7 @@ hal_timer_t timerClaim (timer_cap_t cap, uint32_t timebase)
     uint_fast8_t idx, n_timers = sizeof(timers) / sizeof(dtimer_t);
 
     for(idx = 0; idx < n_timers; idx++) {
-        if((t = timers[idx].claimed ? NULL : &timers[idx])) {
+        if((t = timers[idx].claimed && timers[idx].cap.resolution != cap.resolution ? NULL : &timers[idx])) {
 
             uint32_t f = timer_clk_enable(timers[idx].timer) / 1000;
 
@@ -365,20 +392,28 @@ bool timerCfg (hal_timer_t timer, timer_cfg_t *cfg)
         else
             ((dtimer_t *)timer)->timer->CR1 &= ~TIM_CR1_OPM;
 
-        if((ok = cfg->irq0_callback && ((dtimer_t *)timer)->cap.comp1))
+        if(cfg->irq0_callback && (ok = ((dtimer_t *)timer)->cap.comp1))
             ((dtimer_t *)timer)->timer->DIER |= TIM_DIER_CC1IE;
         else
             ((dtimer_t *)timer)->timer->DIER &= ~TIM_DIER_CC1IE;
 
-        if(ok && (ok = cfg->irq1_callback && ((dtimer_t *)timer)->cap.comp2))
+        if(ok && cfg->irq1_callback && (ok = ((dtimer_t *)timer)->cap.comp2))
             ((dtimer_t *)timer)->timer->DIER |= TIM_DIER_CC2IE;
         else
             ((dtimer_t *)timer)->timer->DIER &= ~TIM_DIER_CC2IE;
+
+        if(ok && cfg->irq2_callback && (ok = ((dtimer_t *)timer)->cap.comp3))
+            ((dtimer_t *)timer)->timer->DIER |= TIM_DIER_CC3IE;
+        else
+            ((dtimer_t *)timer)->timer->DIER &= ~TIM_DIER_CC3IE;
 
         if(ok && cfg->timeout_callback)
             ((dtimer_t *)timer)->timer->DIER |= TIM_DIER_UIE;
         else
             ((dtimer_t *)timer)->timer->DIER &= ~TIM_DIER_UIE;
+
+        HAL_NVIC_SetPriority(((dtimer_t *)timer)->irq, 0, 1);
+        NVIC_EnableIRQ(((dtimer_t *)timer)->irq);
     }
 
     return ok;
@@ -386,28 +421,35 @@ bool timerCfg (hal_timer_t timer, timer_cfg_t *cfg)
 
 bool timerStart (hal_timer_t timer, uint32_t period)
 {
-    period++;
+    if(!(((dtimer_t *)timer)->timer->CR1 & TIM_CR1_CEN) ||
+         (((dtimer_t *)timer)->timer->CR1 & TIM_CR1_OPM) ||
+          period != ((dtimer_t *)timer)->cfg.period) {
 
-    if(((dtimer_t *)timer)->cfg.irq1_callback) {
-        ((dtimer_t *)timer)->timer->CCR2 = period;
-        period += ((dtimer_t *)timer)->cfg.irq1;
-    }
+        ((dtimer_t *)timer)->cfg.period = period;
 
-    if(((dtimer_t *)timer)->cfg.irq0_callback) {
-        ((dtimer_t *)timer)->timer->CCR1 = period;
-        period += ((dtimer_t *)timer)->cfg.irq0;
-    }
+        period--;
 
-    ((dtimer_t *)timer)->timer->ARR = period;
-
-    if(!(((dtimer_t *)timer)->timer->CR1 & TIM_CR1_CEN)) {
-    //    ((dtimer_t *)timer)->timer->CNT = ((dtimer_t *)timer)->timer->ARR;
-        ((dtimer_t *)timer)->timer->SR &= ~(TIM_SR_UIF|TIM_SR_CC1IF|TIM_SR_CC2IF);
-        if(!(((dtimer_t *)timer)->timer->DIER & TIM_DIER_UIE)) {
-            ((dtimer_t *)timer)->timer->DIER |= TIM_DIER_UIE;
-            ((dtimer_t *)timer)->timer->EGR = TIM_EGR_UG;
+        if(((dtimer_t *)timer)->cfg.irq1_callback) {
+            ((dtimer_t *)timer)->timer->CCR2 = period;
+            period += ((dtimer_t *)timer)->cfg.irq1;
         }
-        ((dtimer_t *)timer)->timer->CR1 |= TIM_CR1_CEN;
+
+        if(((dtimer_t *)timer)->cfg.irq0_callback) {
+            ((dtimer_t *)timer)->timer->CCR1 = period;
+            period += ((dtimer_t *)timer)->cfg.irq0;
+        }
+
+        ((dtimer_t *)timer)->timer->ARR = period;
+
+        if(!(((dtimer_t *)timer)->timer->CR1 & TIM_CR1_CEN)) {
+        //    ((dtimer_t *)timer)->timer->CNT = ((dtimer_t *)timer)->timer->ARR;
+            ((dtimer_t *)timer)->timer->SR &= ~(TIM_SR_UIF|TIM_SR_CC1IF|TIM_SR_CC2IF);
+            if(!(((dtimer_t *)timer)->timer->DIER & TIM_DIER_UIE)) {
+                ((dtimer_t *)timer)->timer->DIER |= TIM_DIER_UIE;
+                ((dtimer_t *)timer)->timer->EGR = TIM_EGR_UG;
+            }
+            ((dtimer_t *)timer)->timer->CR1 |= TIM_CR1_CEN;
+        }
     }
 
     return true;
@@ -425,7 +467,7 @@ __attribute__((always_inline)) static inline void _irq_handler (TIM_TypeDef *tim
 {
     uint32_t irq = timer->SR & timer->DIER;
 
-    timer->SR &= ~(TIM_SR_UIF|TIM_SR_CC1IF|TIM_SR_CC2IF);
+    timer->SR &= ~(TIM_SR_UIF|TIM_SR_CC1IF|TIM_SR_CC2IF|TIM_SR_CC3IF);
 
     if(irq & TIM_SR_UIF)
         cfg->timeout_callback(cfg->context);
@@ -435,6 +477,9 @@ __attribute__((always_inline)) static inline void _irq_handler (TIM_TypeDef *tim
 
     if(irq & TIM_SR_CC2IF)
         cfg->irq1_callback(cfg->context);
+
+    if(irq & TIM_SR_CC3IF)
+        cfg->irq2_callback(cfg->context);
 }
 
 #if !IS_TIMER_CLAIMED(TIM1_BASE)

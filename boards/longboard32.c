@@ -3,7 +3,7 @@
 
   Part of grblHAL
 
-  Copyright (c) 2024-2025 Terje Io
+  Copyright (c) 2024-2026 Terje Io
   Copyright (c) 2022 Expatria Technologies
 
   grblHAL is free software: you can redistribute it and/or modify
@@ -35,8 +35,6 @@
 
 static driver_setup_ptr driver_setup;
 
-extern pin_group_pins_t *get_motor_fault_inputs (void);
-
 static void clear_ringleds (void *data)
 {
     if(hal.rgb1.num_devices && hal.rgb1.out) {
@@ -59,27 +57,43 @@ static probe_state_t state = {
     .connected = On
 };
 
-static bool probe_away;
+static bool probe_away, probe_configure = false;
 static xbar_t toolsetter;
 static on_report_options_ptr on_report_options;
 static probe_get_state_ptr hal_probe_get_state;
 static probe_configure_ptr hal_probe_configure;
+static probe_is_triggered_ptr hal_probe_is_triggered;
+
+static bool probeIsTriggered (probe_id_t probe_id)
+{
+    bool triggered = false;
+
+    if(probe_id == Probe_Toolsetter)
+        triggered = (bool)toolsetter.get_value(&toolsetter) ^ settings.probe.invert_toolsetter_input;
+    else
+        triggered = !!hal_probe_is_triggered && hal_probe_is_triggered(probe_id);
+
+    return triggered;
+}
 
 // redirected probing function for SLB OR.
 static probe_state_t getProbeState (void)
 {
-    //get the probe state from the HAL
+    // get the probe state from the HAL
     state = hal_probe_get_state();
-    //get the probe state from the plugin
-    tls_input.triggered = (bool)toolsetter.get_value(&toolsetter) ^ tls_input.inverted;
 
-    //OR the result and return, unless it is an away probe in which case AND the result.
-    if(probe_away)
-        state.triggered &= tls_input.triggered;
-    else
-        state.triggered |= tls_input.triggered;
+    if(!probe_configure) {
 
-    state.tls_triggered = tls_input.triggered;
+        // get the toolsetter state
+        tls_input.inverted = probe_away ? !settings.probe.invert_toolsetter_input : settings.probe.invert_toolsetter_input;
+        tls_input.triggered = (bool)toolsetter.get_value(&toolsetter) ^ tls_input.inverted;
+
+        // OR the result and return, unless it is an away probe in which case AND the result.
+        if(probe_away)
+            state.triggered &= tls_input.triggered;
+        else
+            state.triggered |= tls_input.triggered;
+    }
 
     return state;
 }
@@ -89,12 +103,13 @@ static void probeConfigure (bool is_probe_away, bool probing)
 {
     tls_input.triggered = Off;
     tls_input.is_probing = probing;
-    tls_input.inverted = is_probe_away ? !settings.probe.invert_toolsetter_input : settings.probe.invert_toolsetter_input;
-
     probe_away = is_probe_away;
 
-    if(hal_probe_configure)
+    if(hal_probe_configure) {
+        probe_configure = true;
         hal_probe_configure(is_probe_away, probing);
+        probe_configure = false;
+    }
 }
 
 static void onReportOptions (bool newopt)
@@ -102,7 +117,7 @@ static void onReportOptions (bool newopt)
     on_report_options(newopt);
 
     if(!newopt)
-        report_plugin("SLB Probing", "0.03");
+        report_plugin("SLB Probing", "0.06");
 }
 
 #endif
@@ -131,8 +146,23 @@ static void onStateChanged (sys_state_t state)
 #else
 
 static control_signals_get_state_ptr hal_control_get_state;
-static pin_group_pins_t *fault_inputs;
 static stepper_status_t stepper_status = {};
+
+typedef struct {
+    uint8_t n_pins;
+    struct {
+        uint8_t axis;
+        input_signal_t *input;
+    } motor[N_ABC_MOTORS + 3];
+} motor_pins_t;
+
+motor_pins_t fault_signals = {};
+
+void motor_fault_add_pin (input_signal_t *input, xbar_t *pin)
+{
+    fault_signals.motor[fault_signals.n_pins].input = input;
+    fault_signals.motor[fault_signals.n_pins++].axis = xbar_fault_pin_to_axis(input->id);
+}
 
 static void poll_motor_fault (void *data)
 {
@@ -144,12 +174,12 @@ static void poll_motor_fault (void *data)
 
         task_add_delayed(poll_motor_fault, NULL, 25);
 
-        for(idx = 0; idx < fault_inputs->n_pins; idx++) {
-            uint8_t axis = xbar_fault_pin_to_axis(fault_inputs->pins.inputs[idx].id);
-            if(bit_istrue(settings.motor_fault_enable.mask, bit(axis))) {
-                input_signal_t *input = &fault_inputs->pins.inputs[idx];
+        for(idx = 0; idx < fault_signals.n_pins; idx++) {
+            if(bit_istrue(settings.motor_fault_enable.mask, bit(fault_signals.motor[idx].axis))) {
+                input_signal_t *input = fault_signals.motor[idx].input;
+                input->mode.inverted = bit_istrue(settings.motor_fault_invert.mask, bit(fault_signals.motor[idx].axis));
                 if(DIGITAL_IN(input->port, input->pin) ^ input->mode.inverted)
-                    xbar_stepper_state_set(&stepper_status.fault, axis, fault_inputs->pins.inputs[idx].id >= Input_MotorFaultX_2);
+                    xbar_stepper_state_set(&stepper_status.fault, fault_signals.motor[idx].axis, input->id >= Input_MotorFaultX2);
             }
         }
 
@@ -182,12 +212,15 @@ static control_signals_t getControlState (void)
 
 static bool driverSetup (settings_t *settings)
 {
+    if(!driver_setup(settings))
+        return false;
+
     hal.homing.get_state = NULL; // for now, StallGuard sensorless homing not yet in use. Later check if sensorless homing is enabled.
     hal.home_cap.a.bits = hal.home_cap.b.bits = 0;
     xbar_set_homing_source();
 
 #if !TRINAMIC_ENABLE
-    if((hal.signals_cap.motor_fault = settings->motor_fault_enable.value && (fault_inputs = get_motor_fault_inputs()))) {
+    if((hal.signals_cap.motor_fault = !!settings->motor_fault_enable.value && fault_signals.n_pins)) {
 
         task_add_delayed(poll_motor_fault, NULL, 25);
 
@@ -198,7 +231,7 @@ static bool driverSetup (settings_t *settings)
     }
 #endif
 
-    return driver_setup(settings);
+    return true;
 }
 
 void board_init (void)
@@ -207,10 +240,12 @@ void board_init (void)
 
 #if defined(MODBUS_DIR_AUX) && !(MODBUS_ENABLE & MODBUS_RTU_DIR_ENABLED)
 
-    if((port = ioport_get_info(Port_Digital, Port_Output, MODBUS_DIR_AUX)) && !port->mode.claimed) {
-        uint8_t modbus_dir = MODBUS_DIR_AUX;
-        ioport_claim(Port_Digital, Port_Output, &modbus_dir, "N/A");
-    }
+    io_port_cfg_t d_out;
+
+    uint8_t modbus_dir = MODBUS_DIR_AUX;
+
+    if(ioports_cfg(&d_out, Port_Digital, Port_Output)->n_ports)
+        d_out.claim(&d_out, &modbus_dir, "N/A", (pin_cap_t){});
 
 #endif
 
@@ -220,17 +255,22 @@ void board_init (void)
 
     uint8_t tool_probe_port = SLB_TLS_AUX_INPUT;
 
-    if((port = ioport_get_info(Port_Digital, Port_Input, tool_probe_port)) && !port->mode.claimed) {
+    io_port_cfg_t d_in;
+
+    if(ioports_cfg(&d_in, Port_Digital, Port_Input)->n_ports && (port = d_in.claim(&d_in, &tool_probe_port, NULL, (pin_cap_t){}))) {
+
+        ioport_set_function(port, Input_Toolsetter, NULL);
 
         memcpy(&toolsetter, port, sizeof(xbar_t));
-
-        ioport_claim(Port_Digital, Port_Input, &tool_probe_port, "Toolsetter");
 
         hal_probe_get_state = hal.probe.get_state;
         hal.probe.get_state = getProbeState;
 
         hal_probe_configure = hal.probe.configure;
         hal.probe.configure = probeConfigure;
+
+        hal_probe_is_triggered = hal.probe.is_triggered;
+        hal.probe.is_triggered = probeIsTriggered;
 
         on_report_options = grbl.on_report_options;
         grbl.on_report_options = onReportOptions;

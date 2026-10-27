@@ -194,6 +194,24 @@ static void SystemClock_Config (void)
 
     __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
+    // A bootloader may leave the system clock running from the PLL (or HSE),
+    // switch to HSI so the PLL can be reconfigured.
+
+    if (__HAL_RCC_GET_SYSCLK_SOURCE() != RCC_SYSCLKSOURCE_STATUS_HSI) {
+
+        RCC_ClkInitTypeDef RCC_ClkPreInitStruct = {
+            .ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2,
+            .SYSCLKSource = RCC_SYSCLKSOURCE_HSI,
+            .AHBCLKDivider = RCC_SYSCLK_DIV1,
+            .APB1CLKDivider = RCC_HCLK_DIV4,
+            .APB2CLKDivider = RCC_HCLK_DIV2
+        };
+
+        if (HAL_RCC_ClockConfig(&RCC_ClkPreInitStruct, FLASH_LATENCY_5) != HAL_OK) {
+          Error_Handler();
+        }
+    }
+
     RCC_OscInitTypeDef RCC_OscInitStruct = {
         .OscillatorType = RCC_OSCILLATORTYPE_HSE,
         .HSEState = RCC_HSE_ON,
@@ -209,7 +227,7 @@ static void SystemClock_Config (void)
         .PLL.PLLM = (uint32_t)HSE_VALUE / 1000000UL,
         .PLL.PLLN = 336,
         .PLL.PLLP = RCC_PLLP_DIV2,
-        .PLL.PLLQ = 2,
+        .PLL.PLLQ = 7,
         .PLL.PLLR = 2
   #endif
     };

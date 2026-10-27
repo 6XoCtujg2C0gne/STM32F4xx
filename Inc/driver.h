@@ -4,7 +4,7 @@
 
   Part of grblHAL
 
-  Copyright (c) 2019-2025 Terje Io
+  Copyright (c) 2019-2026 Terje Io
 
   grblHAL is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -80,6 +80,17 @@
 #define timerAF(t, f) timeraf(t, f)
 #define timeraf(t, f) GPIO_AF ## f ## _TIM ## t
 #define timerAPB2(t) (t == 1 || t == 8 || t == 9 || t == 10 || t == 11)
+#define timerCH(c) timerch(c)
+#define timerch(c) TIM_CHANNEL_ ## c
+
+#define DMAinstance(d) DMAinstanceI(d)
+#define DMAinstanceI(d) DMA ## d
+#define DMAstream(d, p) DMAstreamI(d, p)
+#define DMAstreamI(d, p) DMA ## d ## _Stream ## p
+#define DMAchannel(c) DMAchannelI(c)
+#define DMAchannelI(c) DMA_CHANNEL_ ## c
+#define DMA_CLKEN(d) dmaclken(d)
+#define dmaclken(d) __HAL_RCC_DMA ## d ## _CLK_ENABLE
 
 #define usart(t) usartN(t)
 #define usartN(t) USART ## t
@@ -154,6 +165,8 @@
   #include "boards/btt_skr_2.0_map.h"
 #elif defined(BOARD_BTT_SKR_20_DAC)
   #include "boards/btt_skr_2.0_dac_map.h"
+#elif defined(BOARD_BTT_OCTOPUS_PRO)
+  #include "boards/btt_octopus_pro_map.h"
 #elif defined(BOARD_FYSETC_S6)
   #include "boards/fysetc_s6_map.h"
 #elif defined(BOARD_PROTONEER_3XX)
@@ -240,9 +253,8 @@
 #endif
 
 #define IS_TIMER_CLAIMED(INSTANCE) (((INSTANCE) == STEPPER_TIMER_BASE) || \
-                                    ((INSTANCE) == RPM_TIMER_BASE) || \
-                                    ((INSTANCE) == RPM_COUNTER_BASE) || \
                                     ((INSTANCE) == TMC_UART_TIMER_BASE))
+//                                    ((INSTANCE) == TIM3_BASE && SDCARD_SDIO))
 
 // Adjust these values to get more accurate step pulse timings when required, e.g if using high step rates.
 // The default values below are calibrated for 5 microsecond pulses on a F446 @ 180 MHz.
@@ -275,15 +287,6 @@
 
 #include "grbl/driver_opts2.h"
 
-#if SDCARD_ENABLE
-#ifndef SDCARD_SDIO
-#define SDCARD_SDIO 0
-#endif
-#if !SDCARD_SDIO && !defined(SD_CS_PORT)
-#error SD card plugin not supported!
-#endif
-#endif
-
 #if I2C_ENABLE && !defined(I2C_PORT)
 #define I2C_PORT 2 // GPIOB, SCL_PIN = 10, SDA_PIN = 11
 #endif
@@ -302,15 +305,6 @@
 
 #ifndef STEPPERS_ENABLE_PINMODE
 #define STEPPERS_ENABLE_PINMODE PINMODE_OUTPUT
-#endif
-
-#if defined(AUXOUTPUT0_PWM_PORT) || defined(AUXOUTPUT1_PWM_PORT) ||\
-     defined(AUXOUTPUT0_ANALOG_PORT) || defined(AUXOUTPUT1_ANALOG_PORT) ||\
-      defined(AUXINPUT0_ANALOG_PORT) || defined(AUXINPUT1_ANALOG_PORT) ||\
-       defined(MCP3221_ENABLE)
-#define AUX_ANALOG 1
-#else
-#define AUX_ANALOG 0
 #endif
 
 typedef struct {
@@ -361,9 +355,7 @@ void board_init (void);
 #endif
 
 void ioports_init(pin_group_pins_t *aux_inputs, pin_group_pins_t *aux_outputs);
-#if AUX_ANALOG
 void ioports_init_analog (pin_group_pins_t *aux_inputs, pin_group_pins_t *aux_outputs);
-#endif
 void ioports_event (input_signal_t *input);
 
 #endif // __DRIVER_H__

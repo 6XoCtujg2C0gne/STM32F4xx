@@ -5,18 +5,18 @@
 
   Copyright (c) 2020-2021 Terje Io
 
-  Grbl is free software: you can redistribute it and/or modify
+  grblHAL is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
 
-  Grbl is distributed in the hope that it will be useful,
+  grblHAL is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
   GNU General Public License for more details.
 
   You should have received a copy of the GNU General Public License
-  along with Grbl.  If not, see <http://www.gnu.org/licenses/>.
+  along with grblHAL. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "driver.h"
@@ -33,7 +33,7 @@ I2S_HandleTypeDef hi2s1;
 DMA_HandleTypeDef hdma_spi1_tx;
 
 static stepper_pulse_start_ptr stepper_pulse_start;
-static settings_changed_ptr settings_changed;
+static settings_changed_ptr on_settings_changed;
 uint16_t data[4];
 int32_t count[2];
 
@@ -133,9 +133,9 @@ static void MX_DMA_Init (void)
 }
 
 // Reclaim entry points that may have been changed on settings change.
-static void onSettingsChanged (settings_t *settings)
+static void onSettingsChanged (settings_t *settings, settings_changed_flags_t changed)
 {
-    settings_changed(settings);
+    on_settings_changed(settings, changed);
 
     if(hal.stepper.pulse_start != stepperPulseStart) {
         stepper_pulse_start = hal.stepper.pulse_start;
@@ -161,8 +161,8 @@ void board_init (void)
     MX_DMA_Init();
     MX_I2S1_Init();
 
-    settings_changed = hal.settings_changed;
-    hal.settings_changed = onSettingsChanged;
+    on_settings_changed = grbl.on_settings_changed;
+    grbl.on_settings_changed = onSettingsChanged;
 
     stepper_pulse_start = hal.stepper.pulse_start;
     hal.stepper.pulse_start = stepperPulseStart;

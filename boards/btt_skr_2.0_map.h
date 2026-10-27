@@ -190,9 +190,7 @@
 #if SAFETY_DOOR_ENABLE
 #define SAFETY_DOOR_PORT            AUXINPUT0_PORT
 #define SAFETY_DOOR_PIN             AUXINPUT0_PIN
-#endif
-
-#if MOTOR_FAULT_ENABLE
+#elif MOTOR_FAULT_ENABLE
 #define MOTOR_FAULT_PORT            AUXINPUT0_PORT
 #define MOTOR_FAULT_PIN             AUXINPUT0_PIN
 #endif
@@ -214,6 +212,8 @@
 #define SPI_IRQ_PIN                 11                              // ESP-IO4
 #define SPI_RST_PORT                GPIOC
 #define SPI_RST_PIN                 14                              // ESP-RST
+#define WIZNET_CS_PORT              SPI_CS_PORT
+#define WIZNET_CS_PIN               SPI_CS_PIN
 #endif
 
 #if TRINAMIC_UART_ENABLE

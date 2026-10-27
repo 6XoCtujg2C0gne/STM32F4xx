@@ -111,7 +111,7 @@ static DMA_HandleTypeDef spi_dma_tx = {
 #endif
 
 neopixel_cfg_t neopixel = { .intensity = 255 };
-static settings_changed_ptr settings_changed;
+static settings_changed_ptr on_settings_changed;
 
 static inline void _write (void)
 {
@@ -187,11 +187,10 @@ void onSettingsChanged (settings_t *settings, settings_changed_flags_t changed)
         neopixel.num_leds = hal.rgb0.num_devices;
     }
 
-    if(settings_changed)
-        settings_changed(settings, changed);
+    on_settings_changed(settings, changed);
 }
 
-void neopixel_init (void)
+void neopixel_spi_init (void)
 {
     static bool init = false;
 
@@ -220,30 +219,7 @@ void neopixel_init (void)
             .description = "Neopixels"
         };
 
-#elif NEOPIXEL_SPI == 11
-
-        __HAL_RCC_SPI1_CLK_ENABLE();
-        __HAL_RCC_DMA2_CLK_ENABLE();
-
-        GPIO_InitTypeDef GPIO_InitStruct = {
-            .Pin = GPIO_PIN_5,
-            .Mode = GPIO_MODE_AF_PP,
-            .Pull = GPIO_NOPULL,
-            .Speed = GPIO_SPEED_FREQ_VERY_HIGH,
-            .Alternate = GPIO_AF5_SPI1,
-        };
-        HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-        static const periph_pin_t sdi = {
-            .function = Output_MOSI,
-            .group = PinGroup_SPI,
-            .port = GPIOB,
-            .pin = 5,
-            .mode = { .mask = PINMODE_NONE },
-            .description = "Neopixels"
-        };
-
-#elif NEOPIXEL_SPI == 12
+#elif NEOPIXEL_SPI == 11 || NEOPIXEL_SPI == 12
 
         __HAL_RCC_SPI1_CLK_ENABLE();
         __HAL_RCC_DMA2_CLK_ENABLE();
@@ -332,8 +308,8 @@ void neopixel_init (void)
         hal.rgb0.flags = (rgb_properties_t){ .is_strip = On };
         hal.rgb0.cap = (rgb_color_t){ .R = 255, .G = 255, .B = 255 };
 
-        settings_changed = hal.settings_changed;
-        hal.settings_changed = onSettingsChanged;
+        on_settings_changed = grbl.on_settings_changed;
+        grbl.on_settings_changed = onSettingsChanged;
 
         init = true;
     }

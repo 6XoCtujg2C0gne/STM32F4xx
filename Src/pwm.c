@@ -4,7 +4,7 @@
 
   Part of grblHAL
 
-  Copyright (c) 2024 Terje Io
+  Copyright (c) 2024-2025 Terje Io
 
   grblHAL is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -46,7 +46,19 @@ static const pwm_signal_t pwm_pin[] = {
         .port = GPIOB, .pin = 0, .timer = timer(1), .ccr = &timerCCR(1, 2), .ccmr = &timerCCMR(1, 1), .af = timerAF(1, 1),
         .en = timerCCEN(2, N), .pol = timerCCP(2, N), .ois = timerCR2OIS(2, N), .ocm = timerOCM(1, 2), .ocmc = timerOCM(1, 2)
     },
+    {
+        .port = GPIOB, .pin = 1, .timer = timer(1), .ccr = &timerCCR(1, 3), .ccmr = &timerCCMR(1, 2), .af = timerAF(1, 1),
+        .en = timerCCEN(3, N), .pol = timerCCP(3, N), .ois = timerCR2OIS(3, N), .ocm = timerOCM(2, 3), .ocmc = timerOCM(2, 3)
+    },
 #if !IS_TIMER_CLAIMED(TIM2_BASE)
+    {
+        .port = GPIOA, .pin = 0, .timer = timer(2), .ccr = &timerCCR(2, 1), .ccmr = &timerCCMR(2, 1), .af = timerAF(2, 1),
+        .en = timerCCEN(1, ), .pol = timerCCP(1, ), .ois = timerCR2OIS(1,), .ocm = timerOCM(1, 1), .ocmc = timerOCM(1, 1)
+    },
+    {
+        .port = GPIOA, .pin = 1, .timer = timer(2), .ccr = &timerCCR(2, 2), .ccmr = &timerCCMR(2, 1), .af = timerAF(2, 1),
+        .en = timerCCEN(2, ), .pol = timerCCP(2, ), .ois = timerCR2OIS(2,), .ocm = timerOCM(1, 2), .ocmc = timerOCM(1, 2)
+    },
     {
         .port = GPIOA, .pin = 3, .timer = timer(2), .ccr = &timerCCR(2, 4), .ccmr = &timerCCMR(2, 2), .af = timerAF(2, 1),
         .en = timerCCEN(4, ), .pol = timerCCP(4, ), .ois = timerCR2OIS(4, ), .ocm = timerOCM(2, 4), .ocmc = timerOCM(2, 4)
@@ -55,17 +67,23 @@ static const pwm_signal_t pwm_pin[] = {
         .port = GPIOA, .pin = 5, .timer = timer(2), .ccr = &timerCCR(2, 1), .ccmr = &timerCCMR(2, 1), .af = timerAF(2, 1),
         .en = timerCCEN(1, ), .pol = timerCCP(1, ), .ois = timerCR2OIS(1,), .ocm = timerOCM(1, 1), .ocmc = timerOCM(1, 1)
     },
+//#ifdef F446...
     {
-        .port = GPIOB, .pin = 2, .timer = timer(2), .ccr = &timerCCR(1, 4), .ccmr = &timerCCMR(1, 1), .af = timerAF(1, 1),
+        .port = GPIOB, .pin = 2, .timer = timer(2), .ccr = &timerCCR(2, 4), .ccmr = &timerCCMR(2, 2), .af = timerAF(1, 1),
         .en = timerCCEN(4, ), .pol = timerCCP(4, ), .ois = timerCR2OIS(4, ), .ocm = timerOCM(2, 4), .ocmc = timerOCM(2, 4)
     },
+//#endif
     {
-        .port = GPIOB, .pin = 3, .timer = timer(2), .ccr = &timerCCR(1, 2), .ccmr = &timerCCMR(1, 1), .af = timerAF(1, 1),
+        .port = GPIOB, .pin = 3, .timer = timer(2), .ccr = &timerCCR(2, 2), .ccmr = &timerCCMR(2, 1), .af = timerAF(2, 1),
         .en = timerCCEN(2, ), .pol = timerCCP(2, ), .ois = timerCR2OIS(2, ), .ocm = timerOCM(1, 2), .ocmc = timerOCM(1, 2)
     },
     {
         .port = GPIOB, .pin = 10, .timer = timer(2), .ccr = &timerCCR(2, 3), .ccmr = &timerCCMR(2, 2), .af = timerAF(2, 1),
         .en = timerCCEN(3, ), .pol = timerCCP(3, ), .ois = timerCR2OIS(3, ), .ocm = timerOCM(2, 3), .ocmc = timerOCM(2, 3)
+    },
+    {
+        .port = GPIOB, .pin = 11, .timer = timer(2), .ccr = &timerCCR(2, 4), .ccmr = &timerCCMR(2, 2), .af = timerAF(1, 1),
+        .en = timerCCEN(4, ), .pol = timerCCP(4, ), .ois = timerCR2OIS(4, ), .ocm = timerOCM(2, 4), .ocmc = timerOCM(2, 4)
     },
 #endif
 #if !IS_TIMER_CLAIMED(TIM3_BASE)
@@ -80,6 +98,24 @@ static const pwm_signal_t pwm_pin[] = {
     {
         .port = GPIOC, .pin = 8, .timer = timer(3), .ccr = &timerCCR(3, 3), .ccmr = &timerCCMR(3, 2), .af = timerAF(3, 2),
         .en = timerCCEN(3, ), .pol = timerCCP(3, ), .ois = timerCR2OIS(3, ), .ocm = timerOCM(2, 3), .ocmc = timerOCM(2, 3)
+    },
+#endif
+#if !IS_TIMER_CLAIMED(TIM4_BASE)
+    {
+        .port = GPIOD, .pin = 12, .timer = timer(4), .ccr = &timerCCR(4, 1), .ccmr = &timerCCMR(4, 1), .af = timerAF(4, 2),
+        .en = timerCCEN(1, ), .pol = timerCCP(1, ), .ois = timerCR2OIS(1, ), .ocm = timerOCM(1, 1), .ocmc = timerOCM(1, 1)
+    },
+    {
+        .port = GPIOD, .pin = 13, .timer = timer(4), .ccr = &timerCCR(4, 2), .ccmr = &timerCCMR(4, 1), .af = timerAF(4, 2),
+        .en = timerCCEN(2, ), .pol = timerCCP(2, ), .ois = timerCR2OIS(3, ), .ocm = timerOCM(1, 2), .ocmc = timerOCM(1, 2)
+    },
+    {
+        .port = GPIOD, .pin = 14, .timer = timer(4), .ccr = &timerCCR(4, 3), .ccmr = &timerCCMR(4, 2), .af = timerAF(4, 2),
+        .en = timerCCEN(3, ), .pol = timerCCP(3, ), .ois = timerCR2OIS(3, ), .ocm = timerOCM(2, 3), .ocmc = timerOCM(2, 3)
+    },
+    {
+        .port = GPIOD, .pin = 15, .timer = timer(4), .ccr = &timerCCR(4, 4), .ccmr = &timerCCMR(4, 2), .af = timerAF(4, 2),
+        .en = timerCCEN(4, ), .pol = timerCCP(4, ), .ois = timerCR2OIS(3, ), .ocm = timerOCM(2, 4), .ocmc = timerOCM(2, 4)
     },
 #endif
     {

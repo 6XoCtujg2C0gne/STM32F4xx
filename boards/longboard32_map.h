@@ -51,12 +51,12 @@
 #define I2C1_ALT_PINMAP 1
 #endif
 
-#define SERIAL_PORT     34   // GPIOD: TX = 8, GPIOC: RX = 6
-#define SERIAL1_PORT    21   // GPIOD: TX = 5,        RX = 6
+#define SERIAL_PORT     34   // GPIOD: TX = 8, GPIOC: RX = 5 - AUX
+#define SERIAL1_PORT    21   // GPIOD: TX = 5,        RX = 6 - RS-485
 
 #define HAS_BOARD_INIT
-#define WIZCHIP_SPI_PRESCALER   SPI_BAUDRATEPRESCALER_4
-#define FATFS_SPI_PRESCALER     SPI_BAUDRATEPRESCALER_8
+//#define WIZCHIP_SPI_PRESCALER   SPI_BAUDRATEPRESCALER_4
+//#define FATFS_SPI_PRESCALER     SPI_BAUDRATEPRESCALER_8
 
 #if defined(BOARD_LONGBOARD32) && !IS_NUCLEO_DEVKIT
 #undef TRINAMIC_ENABLE
@@ -76,11 +76,6 @@
 #undef MODBUS_DIR_AUX
 #endif
 #define MODBUS_DIR_AUX          4
-
-#if MPG_ENABLE == 1 && !ETHERNET_ENABLE
-#define MPG_MODE_PORT           GPIOA
-#define MPG_MODE_PIN            4
-#endif
 
 // Define step pulse output pins.
 #define X_STEP_PORT             GPIOE
@@ -244,15 +239,16 @@
 
 #endif
 
-//*****Switchbank will always claim the first 4 aux outputs******
-#define AUXOUTPUT3_PORT         GPIOC
-#define AUXOUTPUT3_PIN          14
-#define AUXOUTPUT2_PORT         GPIOC
-#define AUXOUTPUT2_PIN          0
-#define AUXOUTPUT1_PORT         GPIOC
-#define AUXOUTPUT1_PIN          1
-#define AUXOUTPUT0_PORT         GPIOC
+// *** Eventout plugin will default to claim the first 4 aux outputs ***
+#define AUXOUTPUT0_PORT         GPIOC // AUX OUT3 in the schematic
 #define AUXOUTPUT0_PIN          8
+#define AUXOUTPUT1_PORT         GPIOC // AUX OUT2 in the schematic
+#define AUXOUTPUT1_PIN          1
+#define AUXOUTPUT2_PORT         GPIOC // AUX OUT1 in the schematic
+#define AUXOUTPUT2_PIN          0
+#define AUXOUTPUT3_PORT         GPIOC // AUX OUT0 in the schematic
+#define AUXOUTPUT3_PIN          14
+
 #define AUXOUTPUT4_PORT         GPIOB // Modbus direction
 #define AUXOUTPUT4_PIN          0
 
@@ -271,10 +267,10 @@
 #define AUXOUTPUT13_PORT        GPIOB // Coolant mist
 #define AUXOUTPUT13_PIN         4
 
-#define EVENTOUT_1_ACTION       1
-#define EVENTOUT_2_ACTION       4
-#define EVENTOUT_3_ACTION       1
-#define EVENTOUT_4_ACTION       4
+#define EVENTOUT_1_ACTION       1 // Spindle
+#define EVENTOUT_2_ACTION       4 // Mist coolant
+#define EVENTOUT_3_ACTION       1 // Spindle
+#define EVENTOUT_4_ACTION       4 // Mist coolant
 
 #if DRIVER_SPINDLE_ENABLE & SPINDLE_ENA
 #define SPINDLE_ENABLE_PORT     AUXOUTPUT9_PORT
@@ -308,16 +304,15 @@
 #define COOLANT_MIST_PIN        AUXOUTPUT13_PIN
 #endif
 
-#define NEOPIXEL_GPO
-#define LED_PORT                GPIOC // rail LED strip
-#define LED_PIN                 9
+#define LED_PWM_PORT            GPIOC_BASE // rail LED strip (PWM), does not work when debugging due to U14/R96 chopping output
+#define LED_PWM_PIN             9
 #if !defined(DEBUG) && RGB_LED_ENABLE
-#define LED1_PORT               GPIOA // ring LED strip, when enabled SWD debugging is blocked (use $DFU to reenable)
-#define LED1_PIN                13
+#define LED1_GPO_PORT           GPIOA // ring LED strip (GPO), when enabled SWD debugging is blocked (use $DFU to reenable)
+#define LED1_GPO_PIN            13
 #endif
 
-#define AUXINPUT0_ANALOG_PORT  GPIOA
-#define AUXINPUT0_ANALOG_PIN   0
+#define AUXINPUT0_ANALOG_PORT   GPIOA
+#define AUXINPUT0_ANALOG_PIN    0
 
 #define AUXINPUT0_PORT          GPIOD // AUX_IN_0
 #define AUXINPUT0_PIN           12
@@ -347,14 +342,34 @@
 #define AUXINPUT9_PORT          GPIOD // Safety door
 #define AUXINPUT9_PIN           7
 
+#if THCAD2_ENABLE && !I2C_STROBE_ENABLE
+#define THCAD2_PORT             GPIOB_BASE // Remove R92 and C96
+#define THCAD2_PIN              3
+#else
 #define AUXINPUT10_PORT         GPIOB // I2C strobe
 #define AUXINPUT10_PIN          3
+#endif
 
 #define AUXINPUT11_PORT         GPIOC // Probe
 #define AUXINPUT11_PIN          4
 
-#define AUXINPUT13_PORT         GPIOB //  // Reset/EStop
+#if !SPINDLE_ENCODER_ENABLE
+#define AUXINPUT12_PORT         GPIOD // External stepper driver alarm (A)
+#define AUXINPUT12_PIN          2
+#endif
+
+#define AUXINPUT13_PORT         GPIOB // Reset/EStop
 #define AUXINPUT13_PIN          12
+
+#if PLASMA_ENABLE && !defined(M4_AVAILABLE)
+#define AUXINPUT14_PORT         GPIOE // M4 limit
+#define AUXINPUT14_PIN          14
+#endif
+
+#if !ETHERNET_ENABLE && MPG_ENABLE
+#define AUXINPUT15_PORT         GPIOA // MPG mode input
+#define AUXINPUT15_PIN          4
+#endif
 
 #if CONTROL_ENABLE & CONTROL_HALT
 #define RESET_PORT              AUXINPUT13_PORT
@@ -367,19 +382,43 @@
 #endif
 
 // Define probe switch input pin.
-#if PROBE_ENABLE
-#define PROBE_PORT              AUXINPUT11_PORT
-#define PROBE_PIN               AUXINPUT11_PIN
-#endif
+// If LONGBOARD_PROBESWAP is defined, then we swap the probe and toolsetter pins.
+// If undefined, the default behavior is used. Also note longboard32.c has custom code that will MUX tls/probe inputs depending on enabled features.
+#if defined(LONGBOARD_PROBESWAP)
+  #if PROBE_ENABLE
+  #define PROBE_PORT              AUXINPUT3_PORT
+  #define PROBE_PIN               AUXINPUT3_PIN
+  #endif
 
-#if TOOLSETTER_ENABLE
-#define TOOLSETTER_PORT         AUXINPUT3_PORT
-#define TOOLSETTER_PIN          AUXINPUT3_PIN
+  #if TOOLSETTER_ENABLE
+  #define TOOLSETTER_PORT         AUXINPUT11_PORT
+  #define TOOLSETTER_PIN          AUXINPUT11_PIN
+  #endif
+#else
+  #if PROBE_ENABLE
+  #define PROBE_PORT              AUXINPUT11_PORT
+  #define PROBE_PIN               AUXINPUT11_PIN
+  #endif
+
+  #if TOOLSETTER_ENABLE
+  #define TOOLSETTER_PORT         AUXINPUT3_PORT
+  #define TOOLSETTER_PIN          AUXINPUT3_PIN
+  #endif
 #endif
 
 #if I2C_STROBE_ENABLE
 #define I2C_STROBE_PORT         AUXINPUT10_PORT
 #define I2C_STROBE_PIN          AUXINPUT10_PIN
+#endif
+
+#if MPG_ENABLE == 1
+#if defined(AUXINPUT15_PORT)
+#define MPG_MODE_PORT           AUXINPUT15_PORT
+#define MPG_MODE_PIN            AUXINPUT15_PIN
+#elif !I2C_STROBE_ENABLE && defined(AUXINPUT10_PORT)
+#define MPG_MODE_PORT           AUXINPUT10_PORT
+#define MPG_MODE_PIN            AUXINPUT10_PIN
+#endif
 #endif
 
 #if SPINDLE_ENCODER_ENABLE
@@ -396,8 +435,7 @@
 
 #ifdef BOARD_LONGBOARD32
 
-#define AUXINPUT12_PORT         GPIOD // External stepper driver alarm (A) or spindle encoder pulse
-#define AUXINPUT12_PIN          2
+// Not mapped: PD10 -> PRU_RESET
 
 #if MOTOR_FAULT_ENABLE && ((N_GANGED && N_AXIS == 4) || N_AXIS == 5)
 #define MOTOR_FAULT_ENABLE      1
@@ -430,20 +468,45 @@
 #define MOTOR_CSM3_PIN          12
 #endif
 
+#else // SLB_EXT
+
+#define AUXINPUT16_PORT         GPIOA
+#define AUXINPUT16_PIN          15
+#define AUXINPUT17_PORT         GPIOA
+#define AUXINPUT17_PIN          1
+#define AUXINPUT18_PORT         GPIOA
+#define AUXINPUT18_PIN          2
+#define AUXINPUT19_PORT         GPIOA
+#define AUXINPUT19_PIN          3
+
+#define X_MOTOR_FAULT_PORT      AUXINPUT16_PORT
+#define X_MOTOR_FAULT_PIN       AUXINPUT16_PIN
+#define Y_MOTOR_FAULT_PORT      AUXINPUT17_PORT
+#define Y_MOTOR_FAULT_PIN       AUXINPUT17_PIN
+#define Z_MOTOR_FAULT_PORT      AUXINPUT18_PORT
+#define Z_MOTOR_FAULT_PIN       AUXINPUT18_PIN
+#if N_GANGED && N_AXIS == 4
+#ifdef AUXINPUT12_PIN
+#define M3_MOTOR_FAULT_PORT     AUXINPUT12_PORT
+#define M3_MOTOR_FAULT_PIN      AUXINPUT12_PIN
+#endif
+#define M4_MOTOR_FAULT_PORT     AUXINPUT19_PORT
+#define M4_MOTOR_FAULT_PIN      AUXINPUT19_PIN
 #else
-
-#define X_MOTOR_FAULT_PORT      GPIOA
-#define X_MOTOR_FAULT_PIN       15
-#define Y_MOTOR_FAULT_PORT      GPIOA
-#define Y_MOTOR_FAULT_PIN       1
-#define Z_MOTOR_FAULT_PORT      GPIOA
-#define Z_MOTOR_FAULT_PIN       2
-#define MOTOR_FAULT_INMODE      GPIO_BITBAND
-
+#if N_ABC_MOTORS > 0
+#define M3_MOTOR_FAULT_PORT     AUXINPUT19_PORT
+#define M3_MOTOR_FAULT_PIN      AUXINPUT19_PIN
+#endif
+#if N_ABC_MOTORS == 2 && defined(AUXINPUT12_PIN)
+#define M4_MOTOR_FAULT_PORT     AUXINPUT12_PORT
+#define M4_MOTOR_FAULT_PIN      AUXINPUT12_PIN
+#endif
 #endif
 
+#endif // SLB_EXT
+
 #if SDCARD_ENABLE || ETHERNET_ENABLE
-#define SPI_PORT                1 // GPIOA, SCK_PIN = 5, MISO_PIN = 6, MOSI_PIN = 7  probably needs fixing
+#define SPI_PORT                1 // GPIOA, SCK_PIN = 5, MISO_PIN = 6, MOSI_PIN = 7
 #endif
 
 #if ETHERNET_ENABLE
@@ -455,6 +518,8 @@
 #define SPI_IRQ_PIN             10
 #define SPI_RST_PORT            GPIOA // TXD_INT
 #define SPI_RST_PIN             9
+#define WIZNET_CS_PORT          SPI_CS_PORT
+#define WIZNET_CS_PIN           SPI_CS_PIN
 #endif
 
 #if SDCARD_ENABLE
